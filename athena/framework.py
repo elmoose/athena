@@ -3,222 +3,234 @@ import tensorflow as tf
 
 
 class Framework:
-	def __init__ (self, framework_parameters=None):
-		"""
-        Selection constructor function
-
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
-
-        Parameters
-        ----------
-        framework_parameters : int
-            Number of estimators (decision trees) the Random Forest will use.
+    def __init__(self, framework_parameters=None):
         """
-		from athena.equations import Equation
+Selection constructor function
 
-		# ==========================================================================================
-		# Here are the default framework hyper-parameters that can be overriden during class init
-		# TODO: scientifically determine the best default parameters for the majority of cases
-		# ==========================================================================================
-		fp = {
-			"starting_lr": 0.05,
- 			"max_iterations": int(1e4),
- 			"momentum": 0.99,
- 			"optimizer": tf.train.AdamOptimizer
-		}
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
 
-		if framework_parameters is not None:
-			for f, p in framework_parameters.items():
-				if f in fp:
-					fp[f] = p
-				else:
-					raise Exception("Unknown parameter with name {} given to framework initializer.".format(f))
+Parameters
+----------
+framework_parameters : int
+    Number of estimators (decision trees) the Random Forest will use.
+"""
+        from athena.equations import Equation
 
-		self.starting_lr, self.max_iters, self.momentum = fp["starting_lr"], fp["max_iterations"], fp["momentum"]
-		self.tf_optimizer = fp["optimizer"]
+        # ==========================================================================================
+        # Here are the default framework hyper-parameters that can be overriden during class init
+        # TODO: scientifically determine the best default parameters for the majority of cases
+        # ==========================================================================================
+        fp = {
+            "starting_lr": 0.05,
+            "max_iterations": int(1e4),
+            "momentum": 0.99,
+            "optimizer": tf.optimizers.Adam
+        }
 
-		self.tf_graph = tf.Graph()
-		self.session = tf.Session(graph=self.tf_graph)
+        if framework_parameters is not None:
+            for f, p in framework_parameters.items():
+                if f in fp:
+                    fp[f] = p
+                else:
+                    raise Exception(
+                        "Unknown parameter with name {} given to framework initializer.".format(f))
 
-		self.eqn = Equation(self.tf_graph)
-		self.eqn_test = Equation(self.tf_graph)
-		self.dataset = None
-		self.model = None
+        self.starting_lr, self.max_iters, self.momentum = fp[
+            "starting_lr"], fp["max_iterations"], fp["momentum"]
+        self.tf_optimizer = fp["optimizer"]
 
-	def reset (self):
-		"""
-        Selection constructor function
+        self.tf_graph = tf.Graph()
+        self.session = tf.Session(graph=self.tf_graph)
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+        self.eqn = Equation(self.tf_graph)
+        self.eqn_test = Equation(self.tf_graph)
+        self.dataset = None
+        self.model = None
+
+    def reset(self):
         """
-		from athena.equations import Equation
+Selection constructor function
 
-		self.model = None
-		self.tf_graph = tf.Graph()
-		self.session = tf.Session(graph=self.tf_graph)
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        from athena.equations import Equation
 
-		self.eqn = Equation(self.tf_graph)
-		self.eqn_test = Equation(self.tf_graph)
+        self.model = None
+        self.tf_graph = tf.Graph()
+        self.session = tf.Session(graph=self.tf_graph)
 
-		return self
+        self.eqn = Equation(self.tf_graph)
+        self.eqn_test = Equation(self.tf_graph)
 
-	def initialize (self, model, targets=None, loss_function="mse"):
-		"""
-        Selection constructor function
+        return self
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
-
-        Parameters
-        ----------
-        model : int
-            Number of estimators (decision trees) the Random Forest will use.
-        targets : int
-            Number of threads the Random Forest will utilize.
-        loss_function : int
-            Number of threads the Random Forest will utilize.
+    def initialize(self, model, targets=None, loss_function="mse"):
         """
-		from athena.model import Model
+Selection constructor function
 
-		assert isinstance(loss_function, str)
-		self.loss_function = loss_function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
 
-		if targets is None:
-			targets = self.dataset.training_targets
+Parameters
+----------
+model : int
+    Number of estimators (decision trees) the Random Forest will use.
+targets : int
+    Number of threads the Random Forest will utilize.
+loss_function : int
+    Number of threads the Random Forest will utilize.
+"""
+        from athena.model import Model
 
-		assert isinstance(model, Model)
-		predictions = model.get_training_equation()
+        assert isinstance(loss_function, str)
+        self.loss_function = loss_function
 
-		assert self.dataset is not None
+        if targets is None:
+            targets = self.dataset.training_targets
 
-		self.model = model
-		self.training_targets = targets
+        assert isinstance(model, Model)
+        predictions = model.get_training_equation()
 
-		# TODO: fix the non deterministic reduce function when on gpu or multi cpu
-		# see: https://www.twosigma.com/insights/a-workaround-for-non-determinism-in-tensorflow
+        assert self.dataset is not None
 
-		with self.tf_graph.as_default():
-			if self.loss_function == "mse":
-				training_loss = tf.reduce_mean(tf.square(predictions - targets))
-			elif self.loss_function == "r2":
-				numerator = tf.reduce_sum(((targets - predictions) ** 2.0), axis=0)
-				denominator = tf.reduce_sum((targets - tf.reduce_mean(targets, axis=0)) ** 2.0, axis=0)
-				training_loss = -1.0 * tf.reduce_mean(1.0 - (numerator / denominator))
-			elif self.loss_function == "pearson":
-				mx = tf.reduce_mean(targets)
-				my = tf.reduce_mean(predictions)
-				xm, ym = tf.subtract(targets, mx), tf.subtract(predictions, my)
-				r_num = tf.tensordot(xm, ym, axes=1)
-				r_den = tf.sqrt(tf.reduce_sum(xm ** 2.0) * tf.reduce_sum(ym ** 2.0))
-				training_loss = -1.0 * r_num / r_den
-			else:
-				raise ValueError("{} is not a valid loss function.".format(loss_function))
+        self.model = model
+        self.training_targets = targets
 
-			global_step = tf.Variable(0, trainable=False)
-			self.learning_rate = tf.train.exponential_decay(self.starting_lr, global_step, self.max_iters, self.momentum, staircase=True)
-			self.learning_step = self.tf_optimizer(self.learning_rate).minimize(training_loss, global_step=global_step)
+        # TODO: fix the non deterministic reduce function when on gpu or multi cpu
+        # see: https://www.twosigma.com/insights/a-workaround-for-non-determinism-in-tensorflow
 
-			tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
-			self.init = tf.global_variables_initializer()
-			self.session.run(self.init)
+        with self.tf_graph.as_default():
+            if self.loss_function == "mse":
+                training_loss = tf.reduce_mean(
+                    tf.square(predictions - targets))
+            elif self.loss_function == "r2":
+                numerator = tf.reduce_sum(
+                    ((targets - predictions) ** 2.0), axis=0)
+                denominator = tf.reduce_sum(
+                    (targets - tf.reduce_mean(targets, axis=0)) ** 2.0, axis=0)
+                training_loss = -1.0 * \
+                    tf.reduce_mean(1.0 - (numerator / denominator))
+            elif self.loss_function == "pearson":
+                mx = tf.reduce_mean(targets)
+                my = tf.reduce_mean(predictions)
+                xm, ym = tf.subtract(targets, mx), tf.subtract(predictions, my)
+                r_num = tf.tensordot(xm, ym, axes=1)
+                r_den = tf.sqrt(tf.reduce_sum(xm ** 2.0)
+                                * tf.reduce_sum(ym ** 2.0))
+                training_loss = -1.0 * r_num / r_den
+            else:
+                raise ValueError(
+                    "{} is not a valid loss function.".format(loss_function))
 
-		return self
+            global_step = tf.Variable(0, trainable=False)
+            self.learning_rate = tf.train.exponential_decay(
+                self.starting_lr, global_step, self.max_iters, self.momentum, staircase=True)
+            self.learning_step = self.tf_optimizer(self.learning_rate).minimize(
+                training_loss, global_step=global_step)
 
-	def add_dataset (self, dataset):
-		"""
-        Selection constructor function
+            tf.group(tf.global_variables_initializer(),
+                     tf.local_variables_initializer())
+            self.init = tf.global_variables_initializer()
+            self.session.run(self.init)
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+        return self
 
-        Parameters
-        ----------
-        dataset : int
-            Number of estimators (decision trees) the Random Forest will use.
+    def add_dataset(self, dataset):
         """
-		from athena.dataset import Dataset
-		assert isinstance(dataset, Dataset)
-		self.dataset = dataset
+Selection constructor function
 
-	def run (self, x):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+Parameters
+----------
+dataset : int
+    Number of estimators (decision trees) the Random Forest will use.
+"""
+        from athena.dataset import Dataset
+        assert isinstance(dataset, Dataset)
+        self.dataset = dataset
 
-        Parameters
-        ----------
-        x : ?
-            Number of estimators (decision trees) the Random Forest will use.
+    def run(self, x):
         """
-		return self.session.run(x)
+Selection constructor function
 
-	def run_learning_step (self):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+Parameters
+----------
+x : ?
+    Number of estimators (decision trees) the Random Forest will use.
+"""
+        return self.session.run(x)
+
+    def run_learning_step(self):
         """
-		self.run(self.learning_step)
+Selection constructor function
 
-	def before_training_checks (self):
-		# TODO: insert assertions here to check the state of the framework before training is allowed to begin
-		pass
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        self.run(self.learning_step)
 
-	def after_training_checks (self):
-		# TODO: insert assertions here to check the state of the framework (and training results) after training has completed
-		pass
+    def before_training_checks(self):
+        # TODO: insert assertions here to check the state of the framework before training is allowed to begin
+        pass
 
-	def train (self):
-		"""
-        Selection constructor function
+    def after_training_checks(self):
+        # TODO: insert assertions here to check the state of the framework (and training results) after training has completed
+        pass
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+    def train(self):
         """
-		self.before_training_checks()
-		for _ in range(self.max_iters):
-			self.run_learning_step()
-		self.after_training_checks()
+Selection constructor function
 
-	def produce_equation (self, constituents=False):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        self.before_training_checks()
+        for _ in range(self.max_iters):
+            self.run_learning_step()
+        self.after_training_checks()
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
-
-        Parameters
-        ----------
-        constituents : bool
-            Number of estimators (decision trees) the Random Forest will use.
+    def produce_equation(self, constituents=False):
         """
-		from sympy import init_printing
-		init_printing()
-		equations = self.eqn.produce_equations(self.session)
-		if constituents: return equations
-		return self.model.consolidate(equations)
+Selection constructor function
 
-	def get_training_predictions (self):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+Parameters
+----------
+constituents : bool
+    Number of estimators (decision trees) the Random Forest will use.
+"""
+        from sympy import init_printing
+        init_printing()
+        equations = self.eqn.produce_equations(self.session)
+        if constituents:
+            return equations
+        return self.model.consolidate(equations)
+
+    def get_training_predictions(self):
         """
-		return self.run(self.model.get_training_equation())
+Selection constructor function
 
-	def get_testing_predictions (self):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        return self.run(self.model.get_training_equation())
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+    def get_testing_predictions(self):
         """
-		# copy over weights from training equation to testing equation first before running the equation
-		self.run(self.eqn_test.set_weights(self.run(self.eqn.w)))
-		return self.run(self.model.get_testing_equation())
+Selection constructor function
 
-	def close_session (self):
-		"""
-        Selection constructor function
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        # copy over weights from training equation to testing equation first before running the equation
+        self.run(self.eqn_test.set_weights(self.run(self.eqn.w)))
+        return self.run(self.model.get_testing_equation())
 
-        Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+    def close_session(self):
         """
-		self.session.close()
-		del self.tf_graph
-		del self.session
+Selection constructor function
+
+Athena uses a random forest from Scikit-Learn to select the best parameters. Use this constructor to create a Selection class.
+"""
+        self.session.close()
+        del self.tf_graph
+        del self.session
