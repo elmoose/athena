@@ -40,7 +40,7 @@ framework_parameters : int
         self.tf_optimizer = fp["optimizer"]
 
         self.tf_graph = tf.Graph()
-        self.session = tf.Session(graph=self.tf_graph)
+        self.session = tf.compat.v1.Session(graph=self.tf_graph)
 
         self.eqn = Equation(self.tf_graph)
         self.eqn_test = Equation(self.tf_graph)
