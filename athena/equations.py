@@ -20,7 +20,8 @@ class Equation:
 
         # TODO: the number of Tensorflow variables should not be fixed but instead should change dynamically as the model grows
         with self.tf_graph.as_default():
-            self.w = tf.Variable(tf.random_normal([1000], mean=0, stddev=1), name='coefficients')
+            self.w = tf.Variable(tf.random.normal(
+                [1000], mean=0, stddev=1), name='coefficients')
 
         self._wc = int(0)
         self.equations = []
@@ -50,7 +51,8 @@ class Equation:
                 assert isinstance(sub[1], Symbol)
 
                 # TODO: investigate why the following line produces a KeyError in Sympy
-                e["equation-string"] = e["equation-string"].subs(sub[1], session.run(sub[0]) if isinstance(sub[0], Tensor) else sub[0])
+                e["equation-string"] = e["equation-string"].subs(
+                    sub[1], session.run(sub[0]) if isinstance(sub[0], Tensor) else sub[0])
 
             equation.append(e["equation-string"])
 
@@ -97,7 +99,8 @@ class Equation:
             _min, _max = min, max
 
         if isclose(_max, _min):
-            raise ValueError("Trying to normalize {} will incur a divide by zero error.".format(_string))
+            raise ValueError(
+                "Trying to normalize {} will incur a divide by zero error.".format(_string))
 
         normalized_array = (_array - _min) / (_max - _min)
 
@@ -129,38 +132,45 @@ def get_symbols(start, end):
 
 def SimpleSinusoidal(self, h, h_string):
     offset, variables = 3, 1
-    eq = self.w[self._wc] * tf.sin(self.w[self._wc + 1] * h + self.w[self._wc + 2])
+    eq = self.w[self._wc] * \
+        tf.sin(self.w[self._wc + 1] * h + self.w[self._wc + 2])
 
     if isinstance(h_string, str) or isinstance(h_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
         equation_string = syms[0] * sin(syms[1] * syms[-1] + syms[2])
-        parameters_list = [[h_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[h_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(h_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
-        equation_string = syms[0] * sin(syms[1] * h_string["symbolic"] + syms[2])
+        equation_string = syms[0] * \
+            sin(syms[1] * h_string["symbolic"] + syms[2])
         parameters_list = [h_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          h_string["parameters"][1:]
+            h_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
 
 def SimpleSecant(self, h, h_string):
     offset, variables = 4, 1
-    eq = self.w[self._wc] * (self.w[self._wc + 1] * (h - tf.abs(self.w[self._wc + 2])) ** 2 + self.w[self._wc + 3])
+    eq = self.w[self._wc] * (self.w[self._wc + 1] * (h -
+                                                     tf.abs(self.w[self._wc + 2])) ** 2 + self.w[self._wc + 3])
 
     if isinstance(h_string, str) or isinstance(h_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
-        equation_string = syms[0] * (syms[1] * (syms[-1] - abs(syms[2])) ** 2 + syms[3])
-        parameters_list = [[h_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        equation_string = syms[0] * \
+            (syms[1] * (syms[-1] - abs(syms[2])) ** 2 + syms[3])
+        parameters_list = [[h_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(h_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
-        equation_string = syms[0] * (syms[1] * (h_string["symbolic"] - abs(syms[2])) ** 2 + syms[3])
+        equation_string = syms[0] * \
+            (syms[1] * (h_string["symbolic"] - abs(syms[2])) ** 2 + syms[3])
         parameters_list = [h_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          h_string["parameters"][1:]
+            h_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -172,14 +182,15 @@ def Exponential(self, x, x_string):
     if isinstance(x_string, str) or isinstance(x_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
         equation_string = syms[0] * exp(syms[-1] * syms[1])
-        parameters_list = [[x_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[x_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(x_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
         equation_string = syms[0] * exp(x_string["symbolic"] * syms[1])
         parameters_list = [x_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          x_string["parameters"][1:]
+            x_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -195,19 +206,22 @@ def Bias(self):
 
 def FlexiblePower(self, x, x_string):
     offset, variables = 3, 1
-    eq = self.w[self._wc] * ((x ** self.w[self._wc + 1]) + self.w[self._wc + 2])
+    eq = self.w[self._wc] * \
+        ((x ** self.w[self._wc + 1]) + self.w[self._wc + 2])
 
     if isinstance(x_string, str) or isinstance(x_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
         equation_string = syms[0] * (syms[-1] ** (syms[1] + 1.0) + syms[2])
-        parameters_list = [[x_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[x_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(x_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
-        equation_string = syms[0] * (x_string["symbolic"] ** (syms[1] + 1.0) + syms[2])
+        equation_string = syms[0] * \
+            (x_string["symbolic"] ** (syms[1] + 1.0) + syms[2])
         parameters_list = [x_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          x_string["parameters"][1:]
+            x_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -218,7 +232,8 @@ def BipolarPolynomial(self, x, x_string, degree=1):
     eq = 0
     d_index = 0
     for d in range(1, degree + 1):
-        eq += self.w[self._wc + d_index] * ((x + self.w[self._wc + d_index + 1]) ** d)
+        eq += self.w[self._wc + d_index] * \
+            ((x + self.w[self._wc + d_index + 1]) ** d)
         d_index += 2
 
     if isinstance(x_string, str) or isinstance(x_string, Expr):
@@ -227,10 +242,12 @@ def BipolarPolynomial(self, x, x_string, degree=1):
         equation_string = 0
         d_index = 0
         for d in range(1, degree + 1):
-            equation_string += syms[d_index] * ((syms[-1] + syms[d_index + 1]) ** d)
+            equation_string += syms[d_index] * \
+                ((syms[-1] + syms[d_index + 1]) ** d)
             d_index += 2
 
-        parameters_list = [[x_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[x_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(x_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
@@ -238,12 +255,13 @@ def BipolarPolynomial(self, x, x_string, degree=1):
         equation_string = 0
         d_index = 0
         for d in range(1, degree + 1):
-            equation_string += syms[d_index] * ((x_string["symbolic"] + syms[d_index + 1]) ** d)
+            equation_string += syms[d_index] * \
+                ((x_string["symbolic"] + syms[d_index + 1]) ** d)
             d_index += 2
 
         parameters_list = [x_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          x_string["parameters"][1:]
+            x_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -255,14 +273,15 @@ def SimplePolynomial(self, x, x_string):
     if isinstance(x_string, str) or isinstance(x_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
         equation_string = abs(syms[0]) * (syms[-1] + abs(syms[1]))
-        parameters_list = [[x_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[x_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(x_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
         equation_string = abs(syms[0]) * (x_string["symbolic"] + abs(syms[1]))
         parameters_list = [x_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          x_string["parameters"][1:]
+            x_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -274,14 +293,15 @@ def Logarithm(self, x, x_string):
     if isinstance(x_string, str) or isinstance(x_string, Expr):
         syms = get_symbols(1, offset + variables + 1)
         equation_string = syms[0] * log(syms[-1] + syms[1])
-        parameters_list = [[x_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in range(offset)]
+        parameters_list = [[x_string, syms[-1]]] + \
+            [[self.w[self._wc + i], syms[i]] for i in range(offset)]
     else:
         l = len(x_string["parameters"])
         syms = get_symbols(l + 1, offset + variables + l + 1)
         equation_string = syms[0] * log(x_string["symbolic"] + syms[1])
         parameters_list = [x_string["parameters"][0]] + \
                           [[self.w[self._wc + i], syms[i]] for i in range(offset)] + \
-                          x_string["parameters"][1:]
+            x_string["parameters"][1:]
 
     return {"equation": eq, "parameters": parameters_list, "symbolic": equation_string, "offset": offset}
 
@@ -292,10 +312,12 @@ def Sinusoidal(self, x, x_string, h, h_string):
         x + self.w[self._wc + 3])
 
     if isinstance(x_string, dict) or isinstance(h_string, dict):
-        raise NotImplementedError("At this time multi-variable functions do not support composition.")
+        raise NotImplementedError(
+            "At this time multi-variable functions do not support composition.")
 
     syms = get_symbols(1, offset + variables + 1)
-    equation_string = syms[0] * (sin(syms[-1] * 2 * pi + syms[1]) + syms[2]) * (syms[-2] + syms[3])
+    equation_string = syms[0] * (sin(syms[-1] * 2 *
+                                     pi + syms[1]) + syms[2]) * (syms[-2] + syms[3])
     parameters_list = [[x_string, syms[-2]], [h_string, syms[-1]]] + [[self.w[self._wc + i], syms[i]] for i in
                                                                       range(offset)]
 
@@ -319,7 +341,8 @@ def MultiPolynomial(self, *args):
 
     for x_string in equation_objects:
         if isinstance(x_string, dict):
-            raise NotImplementedError("At this time multi-variable functions do not support composition.")
+            raise NotImplementedError(
+                "At this time multi-variable functions do not support composition.")
 
     sub_eq = 1
     j = 2
@@ -362,7 +385,8 @@ def WeightedAverage(self, *args):
 
     for x_string in equation_objects:
         if isinstance(x_string, dict):
-            raise NotImplementedError("At this time multi-variable functions do not support composition.")
+            raise NotImplementedError(
+                "At this time multi-variable functions do not support composition.")
 
     eq = 0
     weights = []
@@ -377,7 +401,8 @@ def WeightedAverage(self, *args):
 
     equation_string = 0
     for i, j in enumerate(equation_objects):
-        equation_string += abs(syms[i]) / sum([abs(x) for x in syms[:-1 * len(equation_objects)]]) * syms[-1 * (i + 1)]
+        equation_string += abs(syms[i]) / sum([abs(x)
+                                               for x in syms[:-1 * len(equation_objects)]]) * syms[-1 * (i + 1)]
 
     parameters_list = []
     for i, j in enumerate(equation_objects):
@@ -404,12 +429,14 @@ def MultiDimensionalSecant(self, *args):
 
     for x_string in equation_objects:
         if isinstance(x_string, dict):
-            raise NotImplementedError("At this time multi-variable functions do not support composition.")
+            raise NotImplementedError(
+                "At this time multi-variable functions do not support composition.")
 
     sub_eq = 1
     j = 2
     for x in variable_objects:
-        sub_eq *= Equation.tf_secant_h(self.w[self._wc + j] * x + self.w[self._wc + j + 1])
+        sub_eq *= Equation.tf_secant_h(self.w[self._wc + j]
+                                       * x + self.w[self._wc + j + 1])
         j += 2
     eq = self.w[self._wc] * (sub_eq + self.w[self._wc + 1])
 
